@@ -1,0 +1,28 @@
+# Local development against the services in ../compose.yaml.
+# `./mvnw spring-boot:run` starts the Compose stack automatically.
+spring:
+  docker:
+    compose:
+      enabled: true
+      file: ../compose.yaml
+      lifecycle-management: start-only
+  mongodb:
+    uri: ${MONGODB_URI:mongodb://invoiceflow:invoiceflow@localhost:27017/invoiceflow?authSource=admin}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${JWT_ISSUER_URI:http://localhost:8180/realms/invoiceflow}
+
+invoiceflow:
+  storage:
+    endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+    access-key: ${MINIO_ACCESS_KEY:invoiceflow}
+    secret-key: ${MINIO_SECRET_KEY:invoiceflow-secret}
+
+logging:
+  level:
+    com.invoiceflow: DEBUG
