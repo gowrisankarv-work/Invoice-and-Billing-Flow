@@ -1,0 +1,73 @@
+# Local infrastructure for InvoiceFlow. Values can be overridden in a .env file (see .env.example).
+name: invoiceflow
+
+services:
+  mongodb:
+    image: mongo:8.0
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-invoiceflow}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-invoiceflow}
+      MONGO_INITDB_DATABASE: invoiceflow
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MinIO no longer publishes images to Docker Hub; this is the community-maintained build of the same
+  # server. Point MINIO_IMAGE elsewhere to use a different registry.
+  minio:
+    image: ${MINIO_IMAGE:-pgsty/minio:RELEASE.2026-08-04T00-00-00Z}
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-invoiceflow}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-invoiceflow-secret}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:9000/minio/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    labels:
+      org.springframework.boot.ignore: "true"
+
+  minio-init:
+    image: ${MINIO_IMAGE:-pgsty/minio:RELEASE.2026-08-04T00-00-00Z}
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-invoiceflow}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-invoiceflow-secret}
+      MINIO_BUCKET: ${MINIO_BUCKET:-invoiceflow-documents}
+    entrypoint: >
+      /bin/sh -c "mc alias set local http://minio:9000 $$MINIO_ACCESS_KEY $$MINIO_SECRET_KEY &&
+      mc mb --ignore-existing local/$$MINIO_BUCKET"
+    labels:
+      org.springframework.boot.ignore: "true"
+
+volumes:
+  mongodb-data:
+  redis-data:
+  minio-data:

@@ -1,0 +1,11 @@
+# Production: every connection setting and secret comes from the environment, with no defaults, so a
+# missing value fails startup instead of silently pointing at a developer service.
+logging:
+  structured:
+    format:
+      console: ecs
+
+management:
+  endpoint:
+    health:
+      show-details: never
